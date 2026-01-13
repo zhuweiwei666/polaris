@@ -31,10 +31,12 @@ WORKDIR /app
 COPY --from=build /repo/apps/web/.next/standalone ./
 COPY --from=build /repo/apps/web/.next/static ./.next/static
 COPY --from=build /repo/apps/web/public ./public
+COPY apps/web/start.sh ./start.sh
+RUN chmod +x /app/start.sh
 
 # Cloud Run provides PORT
 ENV PORT=8080
 EXPOSE 8080
 
-CMD ["node", "server.js"]
+CMD ["/app/start.sh"]
 
