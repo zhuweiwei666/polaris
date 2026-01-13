@@ -25,6 +25,7 @@ variable "openrouter_api_key" {
   type        = string
   description = "OpenRouter API key (stored in Secret Manager)"
   sensitive   = true
+  default     = ""
 }
 
 variable "a2e_api_key" {

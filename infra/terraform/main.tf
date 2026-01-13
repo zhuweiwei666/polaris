@@ -130,12 +130,14 @@ resource "google_secret_manager_secret_version" "redis_url_v" {
 }
 
 resource "google_secret_manager_secret" "openrouter_api_key" {
+  count      = var.openrouter_api_key == "" ? 0 : 1
   secret_id  = "OPENROUTER_API_KEY"
   replication { auto {} }
   depends_on = [google_project_service.services]
 }
 resource "google_secret_manager_secret_version" "openrouter_api_key_v" {
-  secret      = google_secret_manager_secret.openrouter_api_key.id
+  count       = var.openrouter_api_key == "" ? 0 : 1
+  secret      = google_secret_manager_secret.openrouter_api_key[0].id
   secret_data = var.openrouter_api_key
 }
 
