@@ -3,6 +3,7 @@ import { AiTasksService } from "./ai-tasks.service";
 import { AiTaskQueueService } from "./ai-task-queue.service";
 import { PrismaService } from "../db/prisma.service";
 import { ToolsService } from "../tools/tools.service";
+import { Prisma } from "@prisma/client";
 
 type CreateTaskDto = {
   toolId: string;
@@ -58,7 +59,7 @@ export class AiTasksController {
           id: taskId,
           toolId: dto.toolId,
           status: "queued",
-          payload: dto.payload
+          payload: dto.payload as Prisma.InputJsonValue
         }
       });
 
