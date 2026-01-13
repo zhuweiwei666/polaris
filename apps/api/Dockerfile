@@ -32,8 +32,10 @@ WORKDIR /repo
 # Keep monorepo layout to preserve pnpm symlink structure:
 # - /repo/node_modules/.pnpm store
 # - /repo/apps/api/node_modules links into the store
-COPY --from=deps /repo/node_modules ./node_modules
-COPY --from=deps /repo/apps/api/node_modules ./apps/api/node_modules
+# IMPORTANT: Prisma Client is generated during the build stage and lives inside node_modules.
+# Copy from `build` (not `deps`) so the generated client is present at runtime.
+COPY --from=build /repo/node_modules ./node_modules
+COPY --from=build /repo/apps/api/node_modules ./apps/api/node_modules
 COPY --from=build /repo/apps/api/dist ./apps/api/dist
 COPY apps/api/package.json ./apps/api/package.json
 
