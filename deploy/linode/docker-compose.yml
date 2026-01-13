@@ -67,3 +67,6 @@ networks:
   appnet:
     driver: bridge
 
+volumes:
+  pgdata:
+  redisdata:

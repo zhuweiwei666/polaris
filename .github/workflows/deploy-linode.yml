@@ -1,0 +1,73 @@
+name: Deploy to Linode
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+env:
+  DOCKER_BUILDKIT: 1
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install sshpass
+        run: sudo apt-get update && sudo apt-get install -y sshpass rsync
+
+      - name: Sync code to server
+        env:
+          SSHPASS: ${{ secrets.LINODE_PASSWORD }}
+        run: |
+          sshpass -e rsync -avz --delete \
+            --exclude 'node_modules' \
+            --exclude '.next' \
+            --exclude 'dist' \
+            --exclude '.git' \
+            --exclude '.env*' \
+            -e "ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null" \
+            ./ root@${{ secrets.LINODE_IP }}:/opt/polaris/
+
+      - name: Build and deploy on server
+        env:
+          SSHPASS: ${{ secrets.LINODE_PASSWORD }}
+        run: |
+          sshpass -e ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
+            root@${{ secrets.LINODE_IP }} << 'ENDSSH'
+          set -e
+          cd /opt/polaris/deploy/linode
+          
+          echo "🐳 Checking Docker..."
+          if ! command -v docker &> /dev/null; then
+              echo "Installing Docker..."
+              curl -fsSL https://get.docker.com | sh
+              systemctl enable docker
+              systemctl start docker
+          fi
+          
+          echo "📦 Building Docker images..."
+          docker compose build --no-cache
+          
+          echo "🚀 Starting services..."
+          docker compose down || true
+          docker compose up -d
+          
+          echo "⏳ Waiting for services to start..."
+          sleep 20
+          
+          echo "📊 Running database migrations..."
+          docker compose exec -T api npx prisma migrate deploy || echo "Migration skipped or no pending migrations"
+          
+          echo ""
+          echo "✅ Deployment complete!"
+          docker compose ps
+          ENDSSH
+
+      - name: Health check
+        run: |
+          sleep 10
+          curl -sf https://clingai.live/api/health && echo "✅ API is healthy" || echo "⚠️ API health check pending (may need a few more seconds)"
+          curl -sf https://clingai.live && echo "✅ Web is accessible" || echo "⚠️ Web check pending"

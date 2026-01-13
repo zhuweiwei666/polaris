@@ -12,6 +12,8 @@ COPY apps/api/package.json ./apps/api/package.json
 COPY packages/sdk/package.json ./packages/sdk/package.json
 COPY packages/contracts/package.json ./packages/contracts/package.json
 COPY packages/ui/package.json ./packages/ui/package.json
+COPY packages/core/package.json ./packages/core/package.json
+COPY packages/modules/package.json ./packages/modules/package.json
 
 # No lockfile yet; once you have pnpm-lock.yaml committed, switch to --frozen-lockfile
 RUN pnpm install --no-frozen-lockfile
@@ -50,4 +52,3 @@ EXPOSE 8080
 
 # Nest build outputs dist/main.js
 CMD ["node", "apps/api/dist/main.js"]
-

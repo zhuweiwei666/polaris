@@ -13,6 +13,7 @@ import { AiTasksModule } from "./ai-tasks/ai-tasks.module";
 import { ArtifactsModule } from "./artifacts/artifacts.module";
 import { InboxModule } from "./inbox/inbox.module";
 import { BillingModule } from "./billing/billing.module";
+import { AnalyticsModule } from "./analytics/analytics.module";
 
 @Module({
   imports: [
@@ -30,7 +31,8 @@ import { BillingModule } from "./billing/billing.module";
     AiTasksModule,
     ArtifactsModule,
     InboxModule,
-    BillingModule
+    BillingModule,
+    AnalyticsModule
   ]
 })
 export class AppModule {}

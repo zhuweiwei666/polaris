@@ -11,6 +11,8 @@ COPY apps/web/package.json ./apps/web/package.json
 COPY packages/sdk/package.json ./packages/sdk/package.json
 COPY packages/contracts/package.json ./packages/contracts/package.json
 COPY packages/ui/package.json ./packages/ui/package.json
+COPY packages/core/package.json ./packages/core/package.json
+COPY packages/modules/package.json ./packages/modules/package.json
 RUN pnpm install --no-frozen-lockfile
 
 # ---- build ----
@@ -41,4 +43,3 @@ ENV PORT=8080
 EXPOSE 8080
 
 CMD ["/app/start.sh"]
-

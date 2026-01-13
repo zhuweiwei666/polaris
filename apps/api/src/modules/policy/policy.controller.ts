@@ -1,24 +1,27 @@
-import { Controller, Get } from "@nestjs/common";
+import { Controller, Get, Headers } from "@nestjs/common";
+import { PolicyService } from "./policy.service";
+import { CurrentUser, Public, type RequestUser } from "../identity/auth.guard";
 
 @Controller("config")
 export class PolicyController {
+  constructor(private readonly policyService: PolicyService) {}
+
   /**
    * 下发客户端配置（开关、文案、默认参数等）
-   * - 免费策略不写死：由 policy engine + 配置表决定
-   * - 这里先返回占位，后续接数据库/远程配置
    */
+  @Public()
   @Get()
-  getConfig() {
-    return {
-      featureFlags: {
-        enableVideo: true,
-        enableImage: true
-      },
-      quota: {
-        freeDailyRequests: 5,
-        note: "TODO: dynamic policy by platform/country/version/channel"
-      }
-    };
+  async getConfig(
+    @CurrentUser() user: RequestUser | undefined,
+    @Headers("x-platform") platform?: string,
+    @Headers("x-app-version") version?: string,
+    @Headers("x-device-id") deviceId?: string
+  ) {
+    return this.policyService.getConfig({
+      platform,
+      version,
+      userId: user?.userId,
+      deviceId: deviceId ?? user?.deviceId
+    });
   }
 }
-

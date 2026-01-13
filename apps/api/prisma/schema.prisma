@@ -7,6 +7,240 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+// ============ User & Identity ============
+
+model User {
+  id          String   @id @default(cuid())
+  email       String?  @unique
+  displayName String?
+  avatarUrl   String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  identities    Identity[]
+  devices       Device[]
+  subscriptions Subscription[]
+  orders        Order[]
+  wallet        Wallet?
+  quotaUsages   QuotaUsage[]
+  aiTasks       AiTask[]
+  refreshTokens RefreshToken[]
+
+  @@index([email])
+}
+
+enum IdentityProvider {
+  google
+  apple
+  email
+}
+
+model Identity {
+  id         String           @id @default(cuid())
+  userId     String
+  provider   IdentityProvider
+  providerId String           // e.g. Google sub, Apple sub
+  email      String?
+  metadata   Json             @default("{}")
+  createdAt  DateTime         @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerId])
+  @@index([userId])
+}
+
+model Device {
+  id           String   @id @default(cuid())
+  userId       String?
+  deviceId     String   @unique // Client-generated device ID
+  platform     String   // web, ios, android
+  userAgent    String?
+  lastActiveAt DateTime @default(now())
+  createdAt    DateTime @default(now())
+
+  user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([userId])
+}
+
+model RefreshToken {
+  id        String   @id @default(cuid())
+  userId    String
+  token     String   @unique
+  deviceId  String?
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([token])
+}
+
+// ============ Billing & Subscription ============
+
+enum SubscriptionStatus {
+  active
+  expired
+  cancelled
+  pending
+}
+
+enum PaymentChannel {
+  appstore
+  googleplay
+  stripe
+}
+
+model Subscription {
+  id            String             @id @default(cuid())
+  userId        String
+  productId     String
+  planId        String
+  status        SubscriptionStatus @default(pending)
+  channel       PaymentChannel
+  expiresAt     DateTime?
+  autoRenew     Boolean            @default(true)
+  originalTxId  String?            // App Store/Google Play original transaction ID
+  latestTxId    String?
+  metadata      Json               @default("{}")
+  createdAt     DateTime           @default(now())
+  updatedAt     DateTime           @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([status])
+  @@index([originalTxId])
+}
+
+enum OrderStatus {
+  pending
+  completed
+  failed
+  refunded
+}
+
+enum OrderType {
+  subscription
+  coins
+  one_time
+}
+
+model Order {
+  id          String         @id @default(cuid())
+  userId      String
+  productId   String
+  type        OrderType
+  status      OrderStatus    @default(pending)
+  channel     PaymentChannel
+  amount      Int            // cents
+  currency    String         @default("USD")
+  txId        String?        // External transaction ID
+  metadata    Json           @default("{}")
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([status])
+  @@index([txId])
+}
+
+model Wallet {
+  id        String   @id @default(cuid())
+  userId    String   @unique
+  coins     Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user         User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  transactions WalletTransaction[]
+}
+
+enum WalletTxType {
+  purchase
+  use
+  refund
+  bonus
+  expire
+}
+
+model WalletTransaction {
+  id          String       @id @default(cuid())
+  walletId    String
+  type        WalletTxType
+  amount      Int          // positive = credit, negative = debit
+  balance     Int          // balance after transaction
+  description String?
+  relatedId   String?      // e.g. orderId, taskId
+  createdAt   DateTime     @default(now())
+
+  wallet Wallet @relation(fields: [walletId], references: [id], onDelete: Cascade)
+
+  @@index([walletId])
+  @@index([createdAt])
+}
+
+// ============ Quota & Entitlement ============
+
+model QuotaUsage {
+  id        String   @id @default(cuid())
+  userId    String
+  quotaKey  String   // e.g. "daily", "monthly", "image_gen"
+  used      Int      @default(0)
+  period    String   // e.g. "2024-01-15" for daily, "2024-01" for monthly
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, quotaKey, period])
+  @@index([userId])
+}
+
+// ============ Remote Config ============
+
+model RemoteConfig {
+  id        String   @id
+  value     Json
+  enabled   Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model FeatureFlag {
+  id          String   @id
+  enabled     Boolean  @default(false)
+  rollout     Int      @default(100) // percentage 0-100
+  conditions  Json     @default("{}") // e.g. { platform: ["ios"], version: ">=2.0" }
+  description String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+// ============ Analytics ============
+
+model AnalyticsEvent {
+  id         String   @id @default(cuid())
+  name       String
+  userId     String?
+  deviceId   String?
+  appId      String
+  moduleId   String?
+  properties Json     @default("{}")
+  timestamp  DateTime @default(now())
+
+  @@index([name])
+  @@index([userId])
+  @@index([appId])
+  @@index([timestamp])
+}
+
+// ============ AI Provider & Tools ============
+
 enum AiTaskStatus {
   queued
   running
@@ -54,18 +288,21 @@ model Tool {
 }
 
 model AiTask {
-  id        String      @id
-  toolId    String
-  status    AiTaskStatus @default(queued)
-  payload   Json
+  id         String       @id
+  userId     String?
+  toolId     String
+  status     AiTaskStatus @default(queued)
+  payload    Json
   providerId String?
-  modelId   String?
-  error     Json?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  modelId    String?
+  error      Json?
+  createdAt  DateTime     @default(now())
+  updatedAt  DateTime     @updatedAt
 
+  user      User?        @relation(fields: [userId], references: [id], onDelete: SetNull)
   artifacts AiArtifact[]
 
+  @@index([userId])
   @@index([toolId])
   @@index([status])
 }
