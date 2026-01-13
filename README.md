@@ -69,7 +69,8 @@ pnpm -C apps/web dev
 - `GCP_PROJECT_ID`
 - `GCP_REGION`（例如 `asia-east1`）
 - `GCP_ARTIFACT_REPO`（例如 `zhongtai`）
-- `GCP_SA_KEY`（Service Account JSON）
+- （推荐）`GCP_WIF_PROVIDER` + `GCP_WIF_SERVICE_ACCOUNT`（零密钥，GitHub OIDC）
+- （可选回退）`GCP_SA_KEY`（Service Account JSON，不推荐长期使用）
 
 > 其余敏感配置（`OPENROUTER_API_KEY` / `A2E_API_KEY` / `DATABASE_URL` / `REDIS_URL`）建议放到 **GCP Secret Manager**，workflow 会在部署时注入到 Cloud Run。
 
@@ -79,6 +80,21 @@ pnpm -C apps/web dev
 - `A2E_API_KEY`（可选）
 
 你只需要在 GitHub Actions 里手动运行一次：`infra-apply`（它会创建 Cloud SQL / Redis / VPC connector / Secret Manager / runtime SA 等）。
+
+### 零密钥（全自动）GCP 授权：Workload Identity Federation（推荐）
+
+为了做到“你不再手工管理 GCP key”，建议一次性在 Cloud Shell 执行：
+
+```bash
+bash scripts/gcp_wif_bootstrap.sh
+```
+
+脚本会输出两个值，把它们设置成 GitHub repo secrets：
+
+- `GCP_WIF_PROVIDER`
+- `GCP_WIF_SERVICE_ACCOUNT`
+
+设置后，`deploy-gcp-cloudrun` / `infra-apply` 会优先走 WIF，你就可以把 `GCP_SA_KEY` 永久删掉。
 
 > `NEXT_PUBLIC_API_BASE_URL` 不需要手动配置：workflow 会先部署 API，再自动读取 Cloud Run URL，作为 Web build-time 注入。
 
