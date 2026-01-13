@@ -18,6 +18,9 @@ env:
   CLOUDSQL_INSTANCE_NAME: zhongtai-pg
   VPC_CONNECTOR_NAME: zhongtai-conn
   RUNTIME_SERVICE_ACCOUNT: zhongtai-runtime
+  # Safety toggles (default empty/false). Set as repo secrets ENABLE_DB / ENABLE_REDIS to "true" when ready.
+  ENABLE_DB: ${{ secrets.ENABLE_DB }}
+  ENABLE_REDIS: ${{ secrets.ENABLE_REDIS }}
 
 jobs:
   deploy:
@@ -74,10 +77,10 @@ jobs:
           if secret_exists A2E_API_KEY; then
             ARGS+=(--set-secrets "A2E_API_KEY=A2E_API_KEY:latest")
           fi
-          if secret_exists DATABASE_URL; then
+          if [ "${ENABLE_DB}" = "true" ] && secret_exists DATABASE_URL; then
             ARGS+=(--set-secrets "DATABASE_URL=DATABASE_URL:latest")
           fi
-          if secret_exists REDIS_URL; then
+          if [ "${ENABLE_REDIS}" = "true" ] && secret_exists REDIS_URL; then
             ARGS+=(--set-secrets "REDIS_URL=REDIS_URL:latest")
           fi
 
@@ -128,10 +131,11 @@ jobs:
               # Ensure the current deploy identity can read logs (best-effort, requires projectIamAdmin which we already grant).
               ACTIVE_ACCOUNT="$(gcloud auth list --filter=status:ACTIVE --format='value(account)' | head -n 1 || true)"
               if [ -n "${ACTIVE_ACCOUNT}" ]; then
-                gcloud projects add-iam-policy-binding "${PROJECT_ID}" \
-                  --member="serviceAccount:${ACTIVE_ACCOUNT}" \
-                  --role="roles/logging.viewer" \
-                  --quiet >/dev/null 2>&1 || true
+                echo "Ensuring log read permissions for: ${ACTIVE_ACCOUNT}"
+                gcloud projects add-iam-policy-binding "${PROJECT_ID}" --member="serviceAccount:${ACTIVE_ACCOUNT}" --role="roles/logging.viewer" --quiet || true
+                gcloud projects add-iam-policy-binding "${PROJECT_ID}" --member="serviceAccount:${ACTIVE_ACCOUNT}" --role="roles/logging.viewAccessor" --quiet || true
+                # IAM propagation can take a moment.
+                sleep 10
               fi
 
               gcloud logging read \
