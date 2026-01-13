@@ -14,8 +14,19 @@ export class PrismaService extends PrismaClient implements OnModuleInit, OnModul
     if (!process.env.DATABASE_URL) {
       return;
     }
-    this._enabled = true;
-    await this.$connect();
+    // Cloud Run 启动阶段必须尽快开始监听端口；DB 连接失败/超时不应阻塞启动。
+    const timeoutMs = Number(process.env.PRISMA_CONNECT_TIMEOUT_MS ?? 5000);
+    try {
+      await Promise.race([
+        this.$connect(),
+        new Promise((_, reject) => setTimeout(() => reject(new Error("Prisma connect timeout")), timeoutMs))
+      ]);
+      this._enabled = true;
+    } catch (err) {
+      // eslint-disable-next-line no-console
+      console.error("[db] prisma connect skipped (non-blocking):", err);
+      this._enabled = false;
+    }
   }
 
   async onModuleDestroy() {
