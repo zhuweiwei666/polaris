@@ -167,17 +167,39 @@ jobs:
 
       - name: Deploy Web to Cloud Run
         run: |
-          set +e
-          OUT="$(gcloud run deploy "${SERVICE_WEB}" \
-            --image "${WEB_IMAGE}" \
-            --region "${REGION}" \
-            --platform managed \
-            --allow-unauthenticated \
-            --quiet 2>&1)"
-          code=$?
-          set -e
-          echo "${OUT}"
-          if [ $code -ne 0 ]; then
+          attempt=1
+          max_attempts=5
+          backoff=5
+
+          while true; do
+            set +e
+            OUT="$(gcloud run deploy "${SERVICE_WEB}" \
+              --image "${WEB_IMAGE}" \
+              --region "${REGION}" \
+              --platform managed \
+              --allow-unauthenticated \
+              --quiet 2>&1)"
+            code=$?
+            set -e
+
+            echo "${OUT}"
+
+            if [ $code -eq 0 ]; then
+              break
+            fi
+
+            if echo "${OUT}" | grep -q "ABORTED: Conflict"; then
+              if [ $attempt -ge $max_attempts ]; then
+                echo "Exceeded retries for conflict."
+                exit $code
+              fi
+              echo "Deploy conflict detected; retrying in ${backoff}s (attempt ${attempt}/${max_attempts})..."
+              sleep "${backoff}"
+              attempt=$((attempt+1))
+              backoff=$((backoff*2))
+              continue
+            fi
+
             echo ""
             echo "---- Cloud Run web deploy failed. Dumping latest revision logs (best effort) ----"
             REVISION="$(gcloud run revisions list --service "${SERVICE_WEB}" --region "${REGION}" --format='value(metadata.name)' --limit=1 2>/dev/null || true)"
@@ -186,8 +208,8 @@ jobs:
               ACTIVE_ACCOUNT="$(gcloud auth list --filter=status:ACTIVE --format='value(account)' | head -n 1 || true)"
               if [ -n "${ACTIVE_ACCOUNT}" ]; then
                 echo "Ensuring log read permissions for: ${ACTIVE_ACCOUNT}"
-                gcloud projects add-iam-policy-binding "${PROJECT_ID}" --member="serviceAccount:${ACTIVE_ACCOUNT}" --role="roles/logging.viewer" --quiet || true
-                gcloud projects add-iam-policy-binding "${PROJECT_ID}" --member="serviceAccount:${ACTIVE_ACCOUNT}" --role="roles/logging.viewAccessor" --quiet || true
+                gcloud projects add-iam-policy-binding "${PROJECT_ID}" --member="serviceAccount:${ACTIVE_ACCOUNT}" --role="roles/logging.viewer" --quiet >/dev/null 2>&1 || true
+                gcloud projects add-iam-policy-binding "${PROJECT_ID}" --member="serviceAccount:${ACTIVE_ACCOUNT}" --role="roles/logging.viewAccessor" --quiet >/dev/null 2>&1 || true
                 sleep 10
               fi
               gcloud logging read \
@@ -200,5 +222,14 @@ jobs:
               echo "Could not resolve latest revision name."
             fi
             exit $code
-          fi
+          done
+
+      - name: Print Cloud Run URLs
+        if: always()
+        run: |
+          API_URL="$(gcloud run services describe "${SERVICE_API}" --region "${REGION}" --format='value(status.url)' 2>/dev/null || true)"
+          WEB_URL="$(gcloud run services describe "${SERVICE_WEB}" --region "${REGION}" --format='value(status.url)' 2>/dev/null || true)"
+          echo "API_URL=${API_URL}"
+          echo "API_HEALTH=${API_URL}/api/health"
+          echo "WEB_URL=${WEB_URL}"
 
