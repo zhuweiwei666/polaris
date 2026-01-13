@@ -1,8 +1,7 @@
-import { Injectable } from "@nestjs/common";
+import { Injectable, Inject, forwardRef } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import type { AiGenerateRequest, AiGenerateResult, AiProvider } from "./provider.types";
-import { OpenRouterProvider } from "./openrouter.provider";
-import { A2eProvider } from "./a2e.provider";
+import { ProviderRegistryService } from "./provider-registry.service";
 
 /**
  * Mock provider - 仅在没有任何真正 provider key 时启用
@@ -14,15 +13,24 @@ export class MockProvider implements AiProvider {
 
   constructor(
     private readonly config: ConfigService,
-    private readonly openrouter: OpenRouterProvider,
-    private readonly a2e: A2eProvider
+    @Inject(forwardRef(() => ProviderRegistryService))
+    private readonly registry: ProviderRegistryService
   ) {}
 
   /**
    * 仅当 openrouter + a2e 都没配置时启用 Mock
+   * 检查 env 或 DB 中是否有配置 key
    */
   isEnabled(): boolean {
-    return !this.openrouter.isEnabled() && !this.a2e.isEnabled();
+    // 检查 env 变量
+    const hasEnvKey =
+      Boolean(this.config.get<string>("OPENROUTER_API_KEY")) ||
+      Boolean(this.config.get<string>("A2E_API_KEY"));
+    // 检查 DB 配置（通过 registry）
+    const hasDbKey =
+      Boolean(this.registry.getApiKey("openrouter")) ||
+      Boolean(this.registry.getApiKey("a2e"));
+    return !hasEnvKey && !hasDbKey;
   }
 
   async generate(req: AiGenerateRequest): Promise<AiGenerateResult> {
