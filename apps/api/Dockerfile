@@ -29,6 +29,9 @@ FROM node:22-slim AS runtime
 ENV NODE_ENV=production
 WORKDIR /repo
 
+# Prisma runtime needs OpenSSL; ensure runtime image has it so engine target matches generated client.
+RUN apt-get update -y && apt-get install -y openssl ca-certificates && rm -rf /var/lib/apt/lists/*
+
 # Keep monorepo layout to preserve pnpm symlink structure:
 # - /repo/node_modules/.pnpm store
 # - /repo/apps/api/node_modules links into the store
