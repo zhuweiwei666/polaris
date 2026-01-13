@@ -18,6 +18,8 @@ enum AiTaskStatus {
 model Provider {
   id          String   @id
   displayName String
+  apiKey      String?  // Stored API key (takes priority over env)
+  baseUrl     String?  // Optional custom base URL
   enabled     Boolean  @default(true)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt

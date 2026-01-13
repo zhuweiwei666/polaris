@@ -1,4 +1,22 @@
 services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: polaris
+      POSTGRES_PASSWORD: polaris_secret
+      POSTGRES_DB: polaris
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    restart: unless-stopped
+    networks: [appnet]
+
+  redis:
+    image: redis:7-alpine
+    volumes:
+      - redisdata:/data
+    restart: unless-stopped
+    networks: [appnet]
+
   api:
     build:
       context: ../../
@@ -6,12 +24,13 @@ services:
     environment:
       NODE_ENV: production
       PORT: "8080"
-      # Optional - enable when ready
-      DATABASE_URL: ${DATABASE_URL-}
-      REDIS_URL: ${REDIS_URL-}
+      DATABASE_URL: postgresql://polaris:polaris_secret@postgres:5432/polaris?schema=public
+      REDIS_URL: redis://redis:6379
+      # Fallback env keys (DB config takes priority)
       OPENROUTER_API_KEY: ${OPENROUTER_API_KEY-}
       A2E_API_KEY: ${A2E_API_KEY-}
       GCS_BUCKET: ${GCS_BUCKET-}
+    depends_on: [postgres, redis]
     restart: unless-stopped
     networks: [appnet]
 

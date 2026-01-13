@@ -1,10 +1,13 @@
 import { Body, Controller, Get, Param, Patch, Post } from "@nestjs/common";
 import { PrismaService } from "../db/prisma.service";
 import { Prisma } from "@prisma/client";
+import { ProviderRegistryService } from "../ai/providers/provider-registry.service";
 
 type UpsertProviderDto = {
   id: string;
   displayName: string;
+  apiKey?: string;
+  baseUrl?: string;
   enabled?: boolean;
 };
 
@@ -16,7 +19,10 @@ type UpsertModelDto = {
 
 @Controller("admin/providers")
 export class AdminProvidersController {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly registry: ProviderRegistryService
+  ) {}
 
   private assertDb() {
     if (!this.prisma.enabled) {
@@ -27,26 +33,51 @@ export class AdminProvidersController {
   @Get()
   async list() {
     this.assertDb();
-    return this.prisma.provider.findMany({ include: { models: true }, orderBy: { id: "asc" } });
+    // 不返回完整 apiKey，只返回是否已配置
+    const providers = await this.prisma.provider.findMany({ include: { models: true }, orderBy: { id: "asc" } });
+    return providers.map((p) => ({
+      ...p,
+      apiKey: p.apiKey ? `${p.apiKey.slice(0, 8)}...` : null,
+      hasApiKey: Boolean(p.apiKey)
+    }));
   }
 
   @Post()
   async upsert(@Body() dto: UpsertProviderDto) {
     this.assertDb();
-    return this.prisma.provider.upsert({
+    const result = await this.prisma.provider.upsert({
       where: { id: dto.id },
-      create: { id: dto.id, displayName: dto.displayName, enabled: dto.enabled ?? true },
-      update: { displayName: dto.displayName, enabled: dto.enabled ?? true }
+      create: {
+        id: dto.id,
+        displayName: dto.displayName,
+        apiKey: dto.apiKey,
+        baseUrl: dto.baseUrl,
+        enabled: dto.enabled ?? true
+      },
+      update: {
+        displayName: dto.displayName,
+        apiKey: dto.apiKey,
+        baseUrl: dto.baseUrl,
+        enabled: dto.enabled ?? true
+      }
     });
+    // 刷新内存缓存
+    await this.registry.reloadDbKeys();
+    return { ...result, apiKey: result.apiKey ? "***" : null };
   }
 
   @Patch(":id")
   async update(@Param("id") id: string, @Body() dto: Partial<UpsertProviderDto>) {
     this.assertDb();
-    return this.prisma.provider.update({
-      where: { id },
-      data: { displayName: dto.displayName, enabled: dto.enabled }
-    });
+    const data: Prisma.ProviderUpdateInput = {};
+    if (dto.displayName !== undefined) data.displayName = dto.displayName;
+    if (dto.apiKey !== undefined) data.apiKey = dto.apiKey;
+    if (dto.baseUrl !== undefined) data.baseUrl = dto.baseUrl;
+    if (dto.enabled !== undefined) data.enabled = dto.enabled;
+    const result = await this.prisma.provider.update({ where: { id }, data });
+    // 刷新内存缓存
+    await this.registry.reloadDbKeys();
+    return { ...result, apiKey: result.apiKey ? "***" : null };
   }
 
   @Get(":id/models")

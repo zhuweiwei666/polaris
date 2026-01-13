@@ -1,27 +1,38 @@
-import { Injectable } from "@nestjs/common";
+import { Injectable, Inject, forwardRef } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import type { AiGenerateRequest, AiGenerateResult, AiProvider } from "./provider.types";
+import { ProviderRegistryService } from "./provider-registry.service";
 
 @Injectable()
 export class OpenRouterProvider implements AiProvider {
   readonly id = "openrouter";
 
-  constructor(private readonly config: ConfigService) {}
+  constructor(
+    private readonly config: ConfigService,
+    @Inject(forwardRef(() => ProviderRegistryService))
+    private readonly registry: ProviderRegistryService
+  ) {}
+
+  private getApiKey(): string | undefined {
+    // 优先 DB 配置，fallback env
+    return this.registry.getApiKey(this.id) || this.config.get<string>("OPENROUTER_API_KEY");
+  }
 
   isEnabled(): boolean {
-    return Boolean(this.config.get<string>("OPENROUTER_API_KEY"));
+    return Boolean(this.getApiKey());
   }
 
   async generate(req: AiGenerateRequest): Promise<AiGenerateResult> {
+    const apiKey = this.getApiKey();
+    // TODO: 真实调用 OpenRouter API
     // 这里先占位：后续接 OpenRouter chat/completions 或 image API
-    // 注意：真实实现需要超时/重试/熔断/成本记录/内容安全等
     return {
       providerId: this.id,
-      model: req.model ?? "TODO",
+      model: req.model ?? "gpt-4o-mini",
       artifacts: [
         {
           type: "text",
-          content: `TODO(OpenRouter): toolId=${req.toolId}, modality=${req.modality}`
+          content: `[OpenRouter] 已配置 API Key (${apiKey?.slice(0, 8)}...)。\n\n工具：${req.toolId}\n输入：${JSON.stringify(req.payload)}\n\n（真实 API 调用待实现）`
         }
       ]
     };

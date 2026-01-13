@@ -1,21 +1,60 @@
-import { Injectable } from "@nestjs/common";
+import { Injectable, OnModuleInit } from "@nestjs/common";
 import type { AiProvider, ProviderId } from "./provider.types";
 import { OpenRouterProvider } from "./openrouter.provider";
 import { A2eProvider } from "./a2e.provider";
 import { MockProvider } from "./mock.provider";
+import { PrismaService } from "../../db/prisma.service";
 
 /**
  * Provider Registry
- * - 第一阶段：依赖注入固定 provider 列表 + env key 开关
- * - 第二阶段：把 provider 配置（key 来源、默认模型、限流、成本策略）迁移到 DB/Config Center
+ * - 支持从 DB 读取 API key（运营后台配置）
+ * - Fallback 到 env 变量
  */
 @Injectable()
-export class ProviderRegistryService {
+export class ProviderRegistryService implements OnModuleInit {
   private readonly providers: AiProvider[];
+  private dbKeys: Map<string, string> = new Map();
 
-  constructor(openrouter: OpenRouterProvider, a2e: A2eProvider, mock: MockProvider) {
+  constructor(
+    private readonly prisma: PrismaService,
+    openrouter: OpenRouterProvider,
+    a2e: A2eProvider,
+    mock: MockProvider
+  ) {
     // mock 放最后；只有当 openrouter/a2e 都没配置时 mock.isEnabled() 才为 true
     this.providers = [openrouter, a2e, mock];
+  }
+
+  async onModuleInit() {
+    await this.reloadDbKeys();
+  }
+
+  /**
+   * 从 DB 加载 provider 的 apiKey 到内存缓存
+   */
+  async reloadDbKeys() {
+    if (!this.prisma.enabled) return;
+    try {
+      const providers = await this.prisma.provider.findMany({
+        where: { enabled: true },
+        select: { id: true, apiKey: true }
+      });
+      this.dbKeys.clear();
+      for (const p of providers) {
+        if (p.apiKey) {
+          this.dbKeys.set(p.id, p.apiKey);
+        }
+      }
+    } catch {
+      // DB 查询失败不阻塞启动
+    }
+  }
+
+  /**
+   * 获取 provider 的 API key：优先 DB，fallback env
+   */
+  getApiKey(providerId: ProviderId): string | undefined {
+    return this.dbKeys.get(providerId) || undefined;
   }
 
   listEnabled(): AiProvider[] {
