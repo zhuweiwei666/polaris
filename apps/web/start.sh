@@ -1,26 +1,19 @@
 #!/bin/sh
 set -e
 
-# Next.js standalone output location differs depending on monorepo layout.
-# Try a few known paths and fail with a helpful directory listing.
+# Next.js standalone output location in monorepo layout
+SERVER=/app/apps/web/server.js
 
-if [ -f "/app/server.js" ]; then
-  exec node /app/server.js
+if [ -f "$SERVER" ]; then
+  # cd so that cwd-relative .next/static + public are resolved
+  cd /app/apps/web
+  exec node "$SERVER"
 fi
 
-if [ -f "/app/apps/web/server.js" ]; then
-  exec node /app/apps/web/server.js
-fi
-
-if [ -f "/app/apps/web/.next/standalone/server.js" ]; then
-  exec node /app/apps/web/.next/standalone/server.js
-fi
-
-echo "ERROR: Could not find Next.js standalone server.js in expected locations."
+echo "ERROR: Could not find Next.js standalone server.js at $SERVER"
 echo "Top-level /app contents:"
 ls -la /app || true
-echo ""
-echo "First 200 entries under /app (recursive):"
-find /app -maxdepth 4 -type f | head -n 200 || true
+echo "apps/web contents:"
+ls -la /app/apps/web || true
 exit 1
 

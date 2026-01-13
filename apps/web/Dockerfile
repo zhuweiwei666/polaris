@@ -27,10 +27,12 @@ FROM node:22-slim AS runtime
 ENV NODE_ENV=production
 WORKDIR /app
 
-# Next standalone runtime
+# Next standalone runtime:
+# .next/standalone already contains node_modules and server.js under apps/web
 COPY --from=build /repo/apps/web/.next/standalone ./
-COPY --from=build /repo/apps/web/.next/static ./.next/static
-COPY --from=build /repo/apps/web/public ./public
+# Static assets & public MUST go into apps/web sub-path (server.js runs from there).
+COPY --from=build /repo/apps/web/.next/static ./apps/web/.next/static
+COPY --from=build /repo/apps/web/public ./apps/web/public
 COPY apps/web/start.sh ./start.sh
 RUN chmod +x /app/start.sh
 

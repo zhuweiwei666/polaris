@@ -2,6 +2,7 @@ import { Injectable } from "@nestjs/common";
 import type { AiProvider, ProviderId } from "./provider.types";
 import { OpenRouterProvider } from "./openrouter.provider";
 import { A2eProvider } from "./a2e.provider";
+import { MockProvider } from "./mock.provider";
 
 /**
  * Provider Registry
@@ -12,8 +13,9 @@ import { A2eProvider } from "./a2e.provider";
 export class ProviderRegistryService {
   private readonly providers: AiProvider[];
 
-  constructor(openrouter: OpenRouterProvider, a2e: A2eProvider) {
-    this.providers = [openrouter, a2e];
+  constructor(openrouter: OpenRouterProvider, a2e: A2eProvider, mock: MockProvider) {
+    // mock 放最后；只有当 openrouter/a2e 都没配置时 mock.isEnabled() 才为 true
+    this.providers = [openrouter, a2e, mock];
   }
 
   listEnabled(): AiProvider[] {
