@@ -92,7 +92,27 @@ jobs:
             ARGS+=(--vpc-egress private-ranges-only)
           fi
 
+          set +e
           gcloud "${ARGS[@]}" --quiet
+          code=$?
+          set -e
+          if [ $code -ne 0 ]; then
+            echo ""
+            echo "---- Cloud Run deploy failed. Dumping latest revision logs (best effort) ----"
+            REVISION="$(gcloud run revisions list --service "${SERVICE_API}" --region "${REGION}" --format='value(metadata.name)' --limit=1 2>/dev/null || true)"
+            if [ -n "${REVISION}" ]; then
+              echo "Latest revision: ${REVISION}"
+              gcloud logging read \
+                "resource.type=\"cloud_run_revision\" AND resource.labels.service_name=\"${SERVICE_API}\" AND resource.labels.revision_name=\"${REVISION}\"" \
+                --project "${PROJECT_ID}" \
+                --freshness=1h \
+                --limit=80 \
+                --format="table(timestamp,severity,textPayload,jsonPayload.message)" || true
+            else
+              echo "Could not resolve latest revision name."
+            fi
+            exit $code
+          fi
 
       - name: Resolve API base URL for Web build
         run: |
