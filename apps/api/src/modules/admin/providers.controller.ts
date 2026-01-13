@@ -1,5 +1,6 @@
 import { Body, Controller, Get, Param, Patch, Post } from "@nestjs/common";
 import { PrismaService } from "../db/prisma.service";
+import { Prisma } from "@prisma/client";
 
 type UpsertProviderDto = {
   id: string;
@@ -59,8 +60,13 @@ export class AdminProvidersController {
     this.assertDb();
     return this.prisma.providerModel.upsert({
       where: { id: dto.id },
-      create: { id: dto.id, providerId, enabled: dto.enabled ?? true, metadata: dto.metadata ?? {} },
-      update: { enabled: dto.enabled ?? true, metadata: dto.metadata ?? {} }
+      create: {
+        id: dto.id,
+        providerId,
+        enabled: dto.enabled ?? true,
+        metadata: (dto.metadata ?? {}) as Prisma.InputJsonValue
+      },
+      update: { enabled: dto.enabled ?? true, metadata: (dto.metadata ?? {}) as Prisma.InputJsonValue }
     });
   }
 }

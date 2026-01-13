@@ -1,5 +1,6 @@
 import { Body, Controller, Get, Param, Patch, Post } from "@nestjs/common";
 import { PrismaService } from "../db/prisma.service";
+import { Prisma } from "@prisma/client";
 
 type UpsertToolDto = {
   id: string;
@@ -45,8 +46,8 @@ export class AdminToolsController {
         description: dto.description,
         modalityIn: dto.modalityIn,
         modalityOut: dto.modalityOut,
-        schema: dto.schema,
-        providerPolicy: dto.providerPolicy ?? {},
+        schema: dto.schema as Prisma.InputJsonValue,
+        providerPolicy: (dto.providerPolicy ?? {}) as Prisma.InputJsonValue,
         enabled: dto.enabled ?? true
       },
       update: {
@@ -54,8 +55,8 @@ export class AdminToolsController {
         description: dto.description,
         modalityIn: dto.modalityIn,
         modalityOut: dto.modalityOut,
-        schema: dto.schema,
-        providerPolicy: dto.providerPolicy ?? {},
+        schema: dto.schema as Prisma.InputJsonValue,
+        providerPolicy: (dto.providerPolicy ?? {}) as Prisma.InputJsonValue,
         enabled: dto.enabled ?? true
       }
     });
@@ -71,8 +72,8 @@ export class AdminToolsController {
         description: dto.description,
         modalityIn: dto.modalityIn,
         modalityOut: dto.modalityOut,
-        schema: dto.schema,
-        providerPolicy: dto.providerPolicy,
+        schema: dto.schema ? (dto.schema as Prisma.InputJsonValue) : undefined,
+        providerPolicy: dto.providerPolicy ? (dto.providerPolicy as Prisma.InputJsonValue) : undefined,
         enabled: dto.enabled
       }
     });
