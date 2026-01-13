@@ -167,10 +167,38 @@ jobs:
 
       - name: Deploy Web to Cloud Run
         run: |
-          gcloud run deploy "${SERVICE_WEB}" \
+          set +e
+          OUT="$(gcloud run deploy "${SERVICE_WEB}" \
             --image "${WEB_IMAGE}" \
             --region "${REGION}" \
             --platform managed \
             --allow-unauthenticated \
-            --quiet
+            --quiet 2>&1)"
+          code=$?
+          set -e
+          echo "${OUT}"
+          if [ $code -ne 0 ]; then
+            echo ""
+            echo "---- Cloud Run web deploy failed. Dumping latest revision logs (best effort) ----"
+            REVISION="$(gcloud run revisions list --service "${SERVICE_WEB}" --region "${REGION}" --format='value(metadata.name)' --limit=1 2>/dev/null || true)"
+            if [ -n "${REVISION}" ]; then
+              echo "Latest revision: ${REVISION}"
+              ACTIVE_ACCOUNT="$(gcloud auth list --filter=status:ACTIVE --format='value(account)' | head -n 1 || true)"
+              if [ -n "${ACTIVE_ACCOUNT}" ]; then
+                echo "Ensuring log read permissions for: ${ACTIVE_ACCOUNT}"
+                gcloud projects add-iam-policy-binding "${PROJECT_ID}" --member="serviceAccount:${ACTIVE_ACCOUNT}" --role="roles/logging.viewer" --quiet || true
+                gcloud projects add-iam-policy-binding "${PROJECT_ID}" --member="serviceAccount:${ACTIVE_ACCOUNT}" --role="roles/logging.viewAccessor" --quiet || true
+                sleep 10
+              fi
+              gcloud logging read \
+                "resource.type=\"cloud_run_revision\" AND resource.labels.service_name=\"${SERVICE_WEB}\" AND resource.labels.revision_name=\"${REVISION}\"" \
+                --project "${PROJECT_ID}" \
+                --freshness=1h \
+                --limit=120 \
+                --format="table(timestamp,severity,textPayload,jsonPayload.message)" || true
+            else
+              echo "Could not resolve latest revision name."
+            fi
+            exit $code
+          fi
 
