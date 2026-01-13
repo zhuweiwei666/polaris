@@ -9,6 +9,7 @@ export const metadata = {
 
 const navItems = [
   { href: "/", label: "Home" },
+  { href: "/status", label: "Status" },
   { href: "/create", label: "Create" },
   { href: "/library", label: "Library" },
   { href: "/inbox", label: "Inbox" },
@@ -18,6 +19,7 @@ const navItems = [
 ];
 
 export default function RootLayout({ children }: { children: ReactNode }) {
+  const base = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:4000/api";
   return (
     <html lang="zh-CN">
       <body>
@@ -31,7 +33,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
                 </Link>
               ))}
               <div style={{ marginTop: 12 }} className="pill">
-                API 默认：<span className="muted">http://localhost:4000/api</span>
+                API：<span className="muted">{base}</span>
               </div>
             </nav>
             <main>{children}</main>
