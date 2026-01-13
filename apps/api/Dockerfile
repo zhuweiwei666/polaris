@@ -41,6 +41,8 @@ COPY --from=build /repo/node_modules ./node_modules
 COPY --from=build /repo/apps/api/node_modules ./apps/api/node_modules
 COPY --from=build /repo/apps/api/dist ./apps/api/dist
 COPY apps/api/package.json ./apps/api/package.json
+# Copy prisma schema for migrations
+COPY apps/api/prisma ./apps/api/prisma
 
 # Cloud Run provides PORT
 ENV PORT=8080
