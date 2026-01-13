@@ -46,9 +46,6 @@ resource "google_sql_database_instance" "pg" {
   database_version = "POSTGRES_16"
   region           = var.region
 
-  # Use ENTERPRISE edition to allow custom tier.
-  edition = "ENTERPRISE"
-
   settings {
     tier              = "db-custom-2-4096"
     availability_type = "ZONAL"
