@@ -1,0 +1,15 @@
+{
+  "name": "beijixing-zhongtai",
+  "private": true,
+  "packageManager": "pnpm@9.15.0",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev": "echo \"Run dev in a package: pnpm -C apps/api dev OR pnpm -C apps/web dev\"",
+    "lint": "echo \"Add eslint later\"",
+    "typecheck": "pnpm -r typecheck"
+  }
+}
+

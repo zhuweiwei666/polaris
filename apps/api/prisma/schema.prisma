@@ -1,0 +1,83 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum AiTaskStatus {
+  queued
+  running
+  succeeded
+  failed
+  canceled
+}
+
+model Provider {
+  id          String   @id
+  displayName String
+  enabled     Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  models ProviderModel[]
+}
+
+model ProviderModel {
+  id         String   @id
+  providerId String
+  enabled    Boolean  @default(true)
+  metadata   Json     @default("{}")
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  provider Provider @relation(fields: [providerId], references: [id], onDelete: Cascade)
+
+  @@index([providerId])
+}
+
+model Tool {
+  id          String   @id
+  title       String
+  description String
+  modalityIn  String[]
+  modalityOut String[]
+  schema      Json
+  providerPolicy Json @default("{}")
+  enabled     Boolean @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model AiTask {
+  id        String      @id
+  toolId    String
+  status    AiTaskStatus @default(queued)
+  payload   Json
+  providerId String?
+  modelId   String?
+  error     Json?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  artifacts AiArtifact[]
+
+  @@index([toolId])
+  @@index([status])
+}
+
+model AiArtifact {
+  id        String   @id
+  taskId    String
+  type      String
+  objectKey String
+  metadata  Json     @default("{}")
+  createdAt DateTime @default(now())
+
+  task AiTask @relation(fields: [taskId], references: [id], onDelete: Cascade)
+
+  @@index([taskId])
+}
+

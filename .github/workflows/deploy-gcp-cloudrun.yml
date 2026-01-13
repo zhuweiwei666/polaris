@@ -1,0 +1,121 @@
+name: deploy-gcp-cloudrun
+
+on:
+  push:
+    branches: ["main"]
+
+permissions:
+  contents: read
+  id-token: write
+
+env:
+  SERVICE_API: zhongtai-api
+  SERVICE_WEB: zhongtai-web
+  REGION: ${{ secrets.GCP_REGION }}
+  PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
+  AR_REPO: ${{ secrets.GCP_ARTIFACT_REPO }}
+  CLOUDSQL_INSTANCE_NAME: zhongtai-pg
+  VPC_CONNECTOR_NAME: zhongtai-conn
+  RUNTIME_SERVICE_ACCOUNT: zhongtai-runtime
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # Auth to GCP. Two options:
+      # A) Workload Identity Federation (recommended) -> configure google-github-actions/auth with workload_identity_provider
+      # B) Service Account JSON key (simpler) -> store as secret GCP_SA_KEY
+      - name: Auth (Service Account Key)
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GCP_SA_KEY }}
+
+      - name: Setup gcloud
+        uses: google-github-actions/setup-gcloud@v2
+        with:
+          project_id: ${{ env.PROJECT_ID }}
+
+      - name: Configure Docker auth for Artifact Registry
+        run: gcloud auth configure-docker ${{ env.REGION }}-docker.pkg.dev --quiet
+
+      - name: Build & push API image
+        run: |
+          API_IMAGE="${REGION}-docker.pkg.dev/${PROJECT_ID}/${AR_REPO}/${SERVICE_API}:${GITHUB_SHA}"
+          docker build -f apps/api/Dockerfile -t "${API_IMAGE}" .
+          docker push "${API_IMAGE}"
+          echo "API_IMAGE=${API_IMAGE}" >> $GITHUB_ENV
+
+      - name: Deploy API to Cloud Run
+        run: |
+          CLOUDSQL_INSTANCE="${PROJECT_ID}:${REGION}:${CLOUDSQL_INSTANCE_NAME}"
+          RUNTIME_SA_EMAIL="${RUNTIME_SERVICE_ACCOUNT}@${PROJECT_ID}.iam.gserviceaccount.com"
+          ARGS=(run deploy "${SERVICE_API}"
+            --image "${API_IMAGE}"
+            --region "${REGION}"
+            --platform managed
+            --allow-unauthenticated
+            --service-account "${RUNTIME_SA_EMAIL}"
+            --set-env-vars "PORT=8080"
+            --set-env-vars "GCS_BUCKET=${PROJECT_ID}-artifacts"
+          )
+
+          secret_exists() {
+            gcloud secrets describe "$1" --project "${PROJECT_ID}" --format='value(name)' >/dev/null 2>&1
+          }
+
+          # DB/Redis/provider keys are read from GCP Secret Manager (recommended).
+          # Only inject when the secret exists to keep first-time deploy resilient.
+          if secret_exists OPENROUTER_API_KEY; then
+            ARGS+=(--set-secrets "OPENROUTER_API_KEY=OPENROUTER_API_KEY:latest")
+          fi
+          if secret_exists A2E_API_KEY; then
+            ARGS+=(--set-secrets "A2E_API_KEY=A2E_API_KEY:latest")
+          fi
+          if secret_exists DATABASE_URL; then
+            ARGS+=(--set-secrets "DATABASE_URL=DATABASE_URL:latest")
+          fi
+          if secret_exists REDIS_URL; then
+            ARGS+=(--set-secrets "REDIS_URL=REDIS_URL:latest")
+          fi
+
+          # Cloud SQL mount + VPC connector are always safe to set; if the resources don't exist yet, deploy will fail.
+          # So we only enable them when you created Route-2 infra.
+          if gcloud sql instances describe "${CLOUDSQL_INSTANCE_NAME}" --project "${PROJECT_ID}" --format='value(name)' >/dev/null 2>&1; then
+            ARGS+=(--add-cloudsql-instances "${CLOUDSQL_INSTANCE}")
+          fi
+
+          if gcloud compute networks vpc-access connectors describe "${VPC_CONNECTOR_NAME}" --region "${REGION}" --project "${PROJECT_ID}" --format='value(name)' >/dev/null 2>&1; then
+            ARGS+=(--vpc-connector "${VPC_CONNECTOR_NAME}")
+            ARGS+=(--vpc-egress private-ranges-only)
+          fi
+
+          gcloud "${ARGS[@]}" --quiet
+
+      - name: Resolve API base URL for Web build
+        run: |
+          API_URL="$(gcloud run services describe "${SERVICE_API}" --region "${REGION}" --format='value(status.url)')"
+          echo "API_URL=${API_URL}" >> $GITHUB_ENV
+          echo "API_BASE_URL=${API_URL}/api" >> $GITHUB_ENV
+
+      - name: Build & push Web image
+        run: |
+          WEB_IMAGE="${REGION}-docker.pkg.dev/${PROJECT_ID}/${AR_REPO}/${SERVICE_WEB}:${GITHUB_SHA}"
+          docker build -f apps/web/Dockerfile -t "${WEB_IMAGE}" \
+            --build-arg NEXT_PUBLIC_API_BASE_URL="${API_BASE_URL}" \
+            .
+          docker push "${WEB_IMAGE}"
+          echo "WEB_IMAGE=${WEB_IMAGE}" >> $GITHUB_ENV
+
+      - name: Deploy Web to Cloud Run
+        run: |
+          gcloud run deploy "${SERVICE_WEB}" \
+            --image "${WEB_IMAGE}" \
+            --region "${REGION}" \
+            --platform managed \
+            --allow-unauthenticated \
+            --set-env-vars "PORT=8080" \
+            --quiet
+

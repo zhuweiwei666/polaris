@@ -1,0 +1,151 @@
+openapi: 3.0.3
+info:
+  title: Zhongtai API
+  version: 0.1.0
+servers:
+  - url: http://localhost:4000/api
+paths:
+  /health:
+    get:
+      summary: Health check
+      responses:
+        "200":
+          description: OK
+  /config:
+    get:
+      summary: Client config (feature flags, quota policy snapshot)
+      responses:
+        "200":
+          description: OK
+  /tools:
+    get:
+      summary: List tools (registry)
+      responses:
+        "200":
+          description: OK
+  /tools/{toolId}:
+    get:
+      summary: Get tool by toolId
+      parameters:
+        - name: toolId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: OK
+  /ai/tasks:
+    get:
+      summary: List tasks
+      responses:
+        "200":
+          description: OK
+    post:
+      summary: Create task (async)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                toolId:
+                  type: string
+                payload:
+                  type: object
+              required: [toolId, payload]
+      responses:
+        "200":
+          description: OK
+  /ai/tasks/{taskId}:
+    get:
+      summary: Get task
+      parameters:
+        - name: taskId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: OK
+  /ai/tasks/{taskId}/cancel:
+    post:
+      summary: Cancel task
+      parameters:
+        - name: taskId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: OK
+  /artifacts/{artifactId}/download:
+    post:
+      summary: Download artifact via short-lived signed URL (auth required)
+      parameters:
+        - name: artifactId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: OK
+  /inbox:
+    get:
+      summary: List inbox messages
+      responses:
+        "200":
+          description: OK
+  /inbox/unread-count:
+    get:
+      summary: Unread count
+      responses:
+        "200":
+          description: OK
+  /quota/me/usage:
+    get:
+      summary: Current user usage (today/month)
+      responses:
+        "200":
+          description: OK
+  /billing/products:
+    get:
+      summary: List products/plans
+      responses:
+        "200":
+          description: OK
+  /billing/subscription:
+    get:
+      summary: Get current subscription
+      responses:
+        "200":
+          description: OK
+  /billing/orders:
+    get:
+      summary: List orders
+      responses:
+        "200":
+          description: OK
+  /billing/appstore/verify:
+    post:
+      summary: Verify App Store purchase
+      responses:
+        "200":
+          description: OK
+  /billing/googleplay/verify:
+    post:
+      summary: Verify Google Play purchase
+      responses:
+        "200":
+          description: OK
+  /billing/restore:
+    post:
+      summary: Restore purchase
+      responses:
+        "200":
+          description: OK
+
