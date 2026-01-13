@@ -92,27 +92,59 @@ jobs:
             ARGS+=(--vpc-egress private-ranges-only)
           fi
 
-          set +e
-          gcloud "${ARGS[@]}" --quiet
-          code=$?
-          set -e
-          if [ $code -ne 0 ]; then
+          attempt=1
+          max_attempts=5
+          backoff=5
+          while true; do
+            set +e
+            OUT="$(gcloud "${ARGS[@]}" --quiet 2>&1)"
+            code=$?
+            set -e
+            echo "${OUT}"
+
+            if [ $code -eq 0 ]; then
+              break
+            fi
+
+            # Cloud Run deploy can fail with an optimistic-lock conflict if another deploy/update is in-flight.
+            if echo "${OUT}" | grep -q "ABORTED: Conflict"; then
+              if [ $attempt -ge $max_attempts ]; then
+                echo "Exceeded retries for conflict."
+                exit $code
+              fi
+              echo "Deploy conflict detected; retrying in ${backoff}s (attempt ${attempt}/${max_attempts})..."
+              sleep "${backoff}"
+              attempt=$((attempt+1))
+              backoff=$((backoff*2))
+              continue
+            fi
+
             echo ""
             echo "---- Cloud Run deploy failed. Dumping latest revision logs (best effort) ----"
             REVISION="$(gcloud run revisions list --service "${SERVICE_API}" --region "${REGION}" --format='value(metadata.name)' --limit=1 2>/dev/null || true)"
             if [ -n "${REVISION}" ]; then
               echo "Latest revision: ${REVISION}"
+
+              # Ensure the current deploy identity can read logs (best-effort, requires projectIamAdmin which we already grant).
+              ACTIVE_ACCOUNT="$(gcloud auth list --filter=status:ACTIVE --format='value(account)' | head -n 1 || true)"
+              if [ -n "${ACTIVE_ACCOUNT}" ]; then
+                gcloud projects add-iam-policy-binding "${PROJECT_ID}" \
+                  --member="serviceAccount:${ACTIVE_ACCOUNT}" \
+                  --role="roles/logging.viewer" \
+                  --quiet >/dev/null 2>&1 || true
+              fi
+
               gcloud logging read \
                 "resource.type=\"cloud_run_revision\" AND resource.labels.service_name=\"${SERVICE_API}\" AND resource.labels.revision_name=\"${REVISION}\"" \
                 --project "${PROJECT_ID}" \
                 --freshness=1h \
-                --limit=80 \
+                --limit=120 \
                 --format="table(timestamp,severity,textPayload,jsonPayload.message)" || true
             else
               echo "Could not resolve latest revision name."
             fi
             exit $code
-          fi
+          done
 
       - name: Resolve API base URL for Web build
         run: |
