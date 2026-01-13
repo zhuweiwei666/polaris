@@ -1,7 +1,9 @@
 import Link from "next/link";
 
 async function getTools() {
-  const base = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:4000/api";
+  // Server-side fetch should use an internal reachable base (docker network), while client uses NEXT_PUBLIC_*.
+  const base =
+    process.env.API_INTERNAL_BASE_URL ?? process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:4000/api";
   const res = await fetch(`${base}/tools`, { cache: "no-store" });
   if (!res.ok) return [];
   return (await res.json()) as Array<{ toolId: string; title: string; description: string }>;

@@ -9,7 +9,8 @@ async function safeJson(res: Response) {
 }
 
 async function getStatus() {
-  const base = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:4000/api";
+  const base =
+    process.env.API_INTERNAL_BASE_URL ?? process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:4000/api";
 
   const healthRes = await fetch(`${base}/health`, { cache: "no-store" }).catch(() => null);
   const healthOk = Boolean(healthRes && healthRes.ok);

@@ -9,7 +9,8 @@ export default function CreateClient() {
   const sp = useSearchParams();
   const router = useRouter();
   const toolId = sp.get("toolId") ?? "text.write";
-  const base = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:4000/api";
+  // For browser-side fetch, prefer same-origin proxy (/api) when configured.
+  const base = process.env.NEXT_PUBLIC_API_BASE_URL ?? "/api";
 
   const [tool, setTool] = useState<Tool | null>(null);
   const [prompt, setPrompt] = useState("");

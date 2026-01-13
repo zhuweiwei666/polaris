@@ -1,7 +1,8 @@
 import Link from "next/link";
 
 async function getTask(taskId: string) {
-  const base = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:4000/api";
+  const base =
+    process.env.API_INTERNAL_BASE_URL ?? process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:4000/api";
   const res = await fetch(`${base}/ai/tasks/${encodeURIComponent(taskId)}`, { cache: "no-store" });
   if (!res.ok) return null;
   return (await res.json()) as any;
