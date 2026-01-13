@@ -1,7 +1,7 @@
-import { Injectable, Inject, forwardRef } from "@nestjs/common";
+import { Injectable } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import type { AiGenerateRequest, AiGenerateResult, AiProvider } from "./provider.types";
-import { ProviderRegistryService } from "./provider-registry.service";
+import { ProviderConfigService } from "./provider-config.service";
 
 @Injectable()
 export class OpenRouterProvider implements AiProvider {
@@ -9,13 +9,12 @@ export class OpenRouterProvider implements AiProvider {
 
   constructor(
     private readonly config: ConfigService,
-    @Inject(forwardRef(() => ProviderRegistryService))
-    private readonly registry: ProviderRegistryService
+    private readonly providerConfig: ProviderConfigService
   ) {}
 
   private getApiKey(): string | undefined {
     // 优先 DB 配置，fallback env
-    return this.registry.getApiKey(this.id) || this.config.get<string>("OPENROUTER_API_KEY");
+    return this.providerConfig.getApiKey(this.id) || this.config.get<string>("OPENROUTER_API_KEY");
   }
 
   isEnabled(): boolean {

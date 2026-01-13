@@ -1,7 +1,7 @@
 import { Body, Controller, Get, Param, Patch, Post } from "@nestjs/common";
 import { PrismaService } from "../db/prisma.service";
 import { Prisma } from "@prisma/client";
-import { ProviderRegistryService } from "../ai/providers/provider-registry.service";
+import { ProviderConfigService } from "../ai/providers/provider-config.service";
 
 type UpsertProviderDto = {
   id: string;
@@ -21,7 +21,7 @@ type UpsertModelDto = {
 export class AdminProvidersController {
   constructor(
     private readonly prisma: PrismaService,
-    private readonly registry: ProviderRegistryService
+    private readonly providerConfig: ProviderConfigService
   ) {}
 
   private assertDb() {
@@ -62,7 +62,7 @@ export class AdminProvidersController {
       }
     });
     // 刷新内存缓存
-    await this.registry.reloadDbKeys();
+    await this.providerConfig.reloadDbKeys();
     return { ...result, apiKey: result.apiKey ? "***" : null };
   }
 
@@ -76,7 +76,7 @@ export class AdminProvidersController {
     if (dto.enabled !== undefined) data.enabled = dto.enabled;
     const result = await this.prisma.provider.update({ where: { id }, data });
     // 刷新内存缓存
-    await this.registry.reloadDbKeys();
+    await this.providerConfig.reloadDbKeys();
     return { ...result, apiKey: result.apiKey ? "***" : null };
   }
 
