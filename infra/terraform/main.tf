@@ -111,7 +111,9 @@ locals {
 # ---- Secret Manager ----
 resource "google_secret_manager_secret" "database_url" {
   secret_id  = "DATABASE_URL"
-  replication { auto {} }
+  replication {
+    auto {}
+  }
   depends_on = [google_project_service.services]
 }
 resource "google_secret_manager_secret_version" "database_url_v" {
@@ -121,7 +123,9 @@ resource "google_secret_manager_secret_version" "database_url_v" {
 
 resource "google_secret_manager_secret" "redis_url" {
   secret_id  = "REDIS_URL"
-  replication { auto {} }
+  replication {
+    auto {}
+  }
   depends_on = [google_project_service.services]
 }
 resource "google_secret_manager_secret_version" "redis_url_v" {
@@ -132,7 +136,9 @@ resource "google_secret_manager_secret_version" "redis_url_v" {
 resource "google_secret_manager_secret" "openrouter_api_key" {
   count      = var.openrouter_api_key == "" ? 0 : 1
   secret_id  = "OPENROUTER_API_KEY"
-  replication { auto {} }
+  replication {
+    auto {}
+  }
   depends_on = [google_project_service.services]
 }
 resource "google_secret_manager_secret_version" "openrouter_api_key_v" {
@@ -144,7 +150,9 @@ resource "google_secret_manager_secret_version" "openrouter_api_key_v" {
 resource "google_secret_manager_secret" "a2e_api_key" {
   count      = var.a2e_api_key == "" ? 0 : 1
   secret_id  = "A2E_API_KEY"
-  replication { auto {} }
+  replication {
+    auto {}
+  }
   depends_on = [google_project_service.services]
 }
 resource "google_secret_manager_secret_version" "a2e_api_key_v" {
