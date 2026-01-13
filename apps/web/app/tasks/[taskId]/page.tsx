@@ -7,8 +7,9 @@ async function getTask(taskId: string) {
   return (await res.json()) as any;
 }
 
-export default async function TaskDetailPage({ params }: { params: { taskId: string } }) {
-  const task = await getTask(params.taskId);
+export default async function TaskDetailPage({ params }: { params: Promise<{ taskId: string }> }) {
+  const { taskId } = await params;
+  const task = await getTask(taskId);
 
   return (
     <div className="card">
